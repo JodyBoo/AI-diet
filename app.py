@@ -4,7 +4,7 @@ from PIL import Image
 import json
 
 # --- SETUP ---
-genai.configure(api_key=st.secrets["GOOGLE_API_KEY"]) # Use Streamlit Secrets for security
+genai.configure(api_key=st.secrets[AIzaSyA7YcpnfgspSZcEHAYC845VDe6jkEhs3dk]) # Use Streamlit Secrets for security
 model = genai.GenerativeModel('gemini-1.5-flash')
 
 st.set_page_config(page_title="AI Health Coach", page_icon="⚖️")
