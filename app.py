@@ -17,56 +17,64 @@ supabase: Client = create_client(url, key)
 
 st.set_page_config(page_title="VitalAI", page_icon="🥗", layout="centered")
 
-# --- 2. FORCED HIGH-CONTRAST UI (FIXES INVISIBLE TEXT & DARK BOXES) ---
+# --- 2. THE "TOTAL FIX" CSS (FORCE LIGHT MODE EVERYWHERE) ---
 st.markdown("""
     <style>
-    /* 1. Global Backgrounds */
+    /* Force Global Backgrounds */
     .stApp, [data-testid="stSidebar"], [data-testid="stSidebarContent"] {
         background-color: #FFFFFF !important;
     }
 
-    /* 2. Global Text - Force EVERYTHING to Black */
+    /* Force All Text to Black */
     html, body, [class*="st-"], p, h1, h2, h3, label, span, div, small {
         color: #000000 !important;
     }
 
-    /* 3. Dropdowns & Input Boxes (The "Invisible" Fix) */
-    div[data-baseweb="select"] > div, 
-    div[data-baseweb="input"] > div,
-    div[data-baseweb="base-input"],
-    input {
-        background-color: #F0F2F6 !important;
+    /* --- FIX NUMERIC INPUT BUTTONS (Plus/Minus) --- */
+    /* Target the buttons */
+    [data-testid="stNumberInput"] button {
+        background-color: #EEEEEE !important;
         color: #000000 !important;
-        border-radius: 10px !important;
+        border: 1px solid #CCCCCC !important;
     }
     
-    /* Targets the text inside the dropdown once it's selected */
-    div[data-testid="stSelectbox"] div div {
+    /* Target the icons inside the plus/minus buttons */
+    [data-testid="stNumberInput"] button svg {
+        fill: #000000 !important;
         color: #000000 !important;
     }
 
-    /* 4. Sidebar Inputs Specifics */
-    [data-testid="stSidebar"] div[data-baseweb="select"],
-    [data-testid="stSidebar"] div[data-baseweb="input"],
-    [data-testid="stSidebar"] input {
+    /* --- FIX INPUT BOXES & DROPDOWNS --- */
+    input, div[data-baseweb="select"] > div, div[data-baseweb="input"] > div {
         background-color: #F0F2F6 !important;
         color: #000000 !important;
+        border: 1px solid #DDDDDD !important;
     }
 
-    /* 5. File Uploader Fix (Targeting the internal parts) */
+    /* --- FIX FILE UPLOADER (No more black boxes) --- */
     [data-testid="stFileUploader"] {
         background-color: #F0F2F6 !important;
         border: 2px dashed #000000 !important;
         border-radius: 15px !important;
     }
     
-    [data-testid="stFileUploaderContent"] div, 
-    [data-testid="stFileUploaderContent"] span,
-    [data-testid="stFileUploaderContent"] small {
+    /* Target "Browse Files" button inside uploader */
+    [data-testid="stFileUploader"] button {
+        background-color: #DDDDDD !important;
+        color: #000000 !important;
+        border: 1px solid #999999 !important;
+        height: auto !important; /* Don't force giant height on small buttons */
+        padding: 5px 10px !important;
+    }
+
+    /* Target all text inside the uploader content */
+    [data-testid="stFileUploaderDropzoneInstructions"] div, 
+    [data-testid="stFileUploaderDropzoneInstructions"] span,
+    [data-testid="stFileUploaderDropzoneInstructions"] small {
         color: #000000 !important;
     }
 
-    /* 6. Dashboard Cards */
+    /* --- DASHBOARD CARDS --- */
     .metric-card {
         background-color: #FFFFFF;
         padding: 20px;
@@ -77,7 +85,7 @@ st.markdown("""
         color: #000000 !important;
     }
 
-    /* 7. All Buttons */
+    /* --- LARGE ACTION BUTTONS --- */
     .stButton>button {
         width: 100%;
         border-radius: 12px;
@@ -89,10 +97,8 @@ st.markdown("""
         border: none !important;
     }
 
-    /* Hide Streamlit default UI elements */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
+    /* Hide Streamlit default Header/Footer */
+    header, footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
