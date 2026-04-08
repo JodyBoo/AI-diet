@@ -10,57 +10,63 @@ from supabase import create_client, Client
 genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 model = genai.GenerativeModel('gemini-1.5-flash')
 
+# Connect to Supabase
 url: str = st.secrets["SUPABASE_URL"]
 key: str = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(url, key)
 
 st.set_page_config(page_title="VitalAI", page_icon="🥗", layout="centered")
 
-# --- 2. FORCED HIGH-CONTRAST UI (FIXES INVISIBLE TEXT) ---
+# --- 2. FORCED HIGH-CONTRAST UI (FIXES INVISIBLE TEXT & DARK BOXES) ---
 st.markdown("""
     <style>
-    /* 1. Force Global Background to White */
+    /* 1. Global Backgrounds */
     .stApp, [data-testid="stSidebar"], [data-testid="stSidebarContent"] {
         background-color: #FFFFFF !important;
     }
 
-    /* 2. Force ALL text elements to Black */
+    /* 2. Global Text - Force EVERYTHING to Black */
     html, body, [class*="st-"], p, h1, h2, h3, label, span, div, small {
         color: #000000 !important;
     }
 
-    /* 3. FIX INPUT BOXES (Number input, Select, Text) */
-    /* This makes the boxes light grey so the black text is visible */
-    input, div[data-baseweb="select"], div[data-baseweb="input"] {
+    /* 3. Dropdowns & Input Boxes (The "Invisible" Fix) */
+    div[data-baseweb="select"] > div, 
+    div[data-baseweb="input"] > div,
+    div[data-baseweb="base-input"],
+    input {
         background-color: #F0F2F6 !important;
         color: #000000 !important;
         border-radius: 10px !important;
     }
+    
+    /* Targets the text inside the dropdown once it's selected */
+    div[data-testid="stSelectbox"] div div {
+        color: #000000 !important;
+    }
 
-    /* 4. FIX SIDEBAR INPUTS SPECIFICALLY */
-    [data-testid="stSidebar"] input, [data-testid="stSidebar"] div[data-baseweb="select"] {
+    /* 4. Sidebar Inputs Specifics */
+    [data-testid="stSidebar"] div[data-baseweb="select"],
+    [data-testid="stSidebar"] div[data-baseweb="input"],
+    [data-testid="stSidebar"] input {
         background-color: #F0F2F6 !important;
         color: #000000 !important;
     }
 
-    /* 5. FIX FILE UPLOADER (The black box issue) */
+    /* 5. File Uploader Fix (Targeting the internal parts) */
     [data-testid="stFileUploader"] {
         background-color: #F0F2F6 !important;
-        border: 2px dashed #CCCCCC !important;
+        border: 2px dashed #000000 !important;
         border-radius: 15px !important;
-        padding: 10px !important;
     }
     
-    [data-testid="stFileUploader"] section {
-        color: #000000 !important;
-    }
-    
-    /* Small text inside uploader */
-    [data-testid="stFileUploader"]  div div div div {
+    [data-testid="stFileUploaderContent"] div, 
+    [data-testid="stFileUploaderContent"] span,
+    [data-testid="stFileUploaderContent"] small {
         color: #000000 !important;
     }
 
-    /* 6. STYLE DASHBOARD CARDS */
+    /* 6. Dashboard Cards */
     .metric-card {
         background-color: #FFFFFF;
         padding: 20px;
@@ -68,10 +74,10 @@ st.markdown("""
         text-align: center;
         border: 1px solid #EEEEEE;
         box-shadow: 0px 4px 10px rgba(0,0,0,0.05);
-        color: #000000;
+        color: #000000 !important;
     }
 
-    /* 7. BLACK BUTTONS */
+    /* 7. All Buttons */
     .stButton>button {
         width: 100%;
         border-radius: 12px;
@@ -83,8 +89,10 @@ st.markdown("""
         border: none !important;
     }
 
-    /* Hide Streamlit Header/Footer */
-    header, footer {visibility: hidden;}
+    /* Hide Streamlit default UI elements */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
@@ -160,6 +168,7 @@ with st.sidebar:
     
     budget, bmi, bmi_cat = get_health_stats(curr_w, target_w, h, a, g, act, pace)
     
+    st.write("---")
     if st.button("🔄 Reset Daily Log"):
         supabase.table("health_logs").delete().eq("log_date", str(date.today())).execute()
         st.session_state.total_calories = 0
