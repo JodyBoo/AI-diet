@@ -15,11 +15,71 @@ url: str = st.secrets["SUPABASE_URL"]
 key: str = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(url, key)
 
-st.set_page_config(page_title="VitalAI Pro", page_icon="🥗", layout="centered")
+st.set_page_config(page_title="VitalAI", page_icon="🥗", layout="centered")
 
-# --- 2. DATABASE FUNCTIONS ---
+# --- 2. MOBILE-FIRST CLEAN THEME (WHITE & BLACK) ---
+st.markdown("""
+    <style>
+    /* Global Styles */
+    .stApp { background-color: #FFFFFF; }
+    html, body, [class*="st-"] { 
+        color: #000000 !important; 
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    
+    /* Hide Streamlit elements for "App" feel */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+
+    /* Metric Cards */
+    .metric-card {
+        background-color: #FFFFFF;
+        padding: 20px;
+        border-radius: 15px;
+        text-align: center;
+        border: 1px solid #EEEEEE;
+        box-shadow: 0px 2px 8px rgba(0,0,0,0.05);
+        margin-bottom: 10px;
+    }
+
+    /* Buttons - Large for Mobile */
+    .stButton>button {
+        width: 100%;
+        border-radius: 12px;
+        background-color: #000000;
+        color: #FFFFFF !important;
+        height: 3.5rem;
+        font-size: 18px;
+        font-weight: 600;
+        border: none;
+    }
+
+    /* Input Styling */
+    .stTextInput>div>div>input, .stNumberInput>div>div>input {
+        background-color: #F8F9FA;
+        border-radius: 10px;
+        border: 1px solid #EEEEEE;
+    }
+
+    /* File Uploader Box */
+    [data-testid="stFileUploader"] {
+        background-color: #F8F9FA;
+        border: 2px dashed #000000;
+        border-radius: 15px;
+        padding: 10px;
+    }
+
+    /* Metric Values */
+    div[data-testid="stMetricValue"] {
+        color: #000000 !important;
+        font-weight: 800 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# --- 3. DATABASE FUNCTIONS ---
 def load_today_data():
-    """Checks DB for today's entry and loads into session state"""
     today = str(date.today())
     try:
         response = supabase.table("health_logs").select("*").eq("log_date", today).execute()
@@ -30,12 +90,10 @@ def load_today_data():
             st.session_state.macros = {"P": data['protein'], "C": data['carbs'], "F": data['fats']}
             st.session_state.food_history = data['food_history']
             return True
-    except Exception as e:
-        print(f"Empty or Error: {e}")
+    except: return False
     return False
 
 def save_to_db():
-    """Saves current state to DB (Upsert)"""
     today = str(date.today())
     payload = {
         "log_date": today,
@@ -48,7 +106,7 @@ def save_to_db():
     }
     supabase.table("health_logs").upsert(payload, on_conflict="log_date").execute()
 
-# --- 3. DATA PERSISTENCE INITIALIZATION ---
+# --- 4. DATA INITIALIZATION ---
 if 'db_loaded' not in st.session_state:
     if not load_today_data():
         st.session_state.total_calories = 0
@@ -56,16 +114,6 @@ if 'db_loaded' not in st.session_state:
         st.session_state.macros = {"P": 0, "C": 0, "F": 0}
         st.session_state.food_history = []
     st.session_state.db_loaded = True
-
-# --- 4. CUSTOM CSS ---
-st.markdown("""
-    <style>
-    html, body, [class*="st-"] { color: #2E7D32 !important; }
-    h1, h2, h3 { color: #1B5E20 !important; }
-    .stButton>button { border-radius: 20px; background-color: #2E7D32; color: white !important; font-weight: bold; border: none; }
-    .metric-card { background-color: #F1F8E9; padding: 15px; border-radius: 12px; text-align: center; border: 1px solid #C8E6C9; }
-    </style>
-    """, unsafe_allow_html=True)
 
 # --- 5. CORE LOGIC ---
 def get_health_stats(w, target_w, h, a, g, act, pace):
@@ -87,11 +135,11 @@ def log_food(name, cal, p, c, f):
     st.session_state.macros["C"] += c
     st.session_state.macros["F"] += f
     st.session_state.food_history.append({"Meal": name, "Kcal": cal, "P": p, "C": c, "F": f})
-    save_to_db() # PERSISTENCE!
+    save_to_db()
 
-# --- 6. SIDEBAR ---
+# --- 6. SIDEBAR SETTINGS ---
 with st.sidebar:
-    st.title("🍏 Profile")
+    st.title("👤 Profile")
     a = st.number_input("Age", 13, 100, 25)
     g = st.selectbox("Gender", ["Female", "Male"])
     h = st.number_input("Height (cm)", 100, 250, 170)
@@ -102,74 +150,95 @@ with st.sidebar:
     
     budget, bmi, bmi_cat = get_health_stats(curr_w, target_w, h, a, g, act, pace)
     
-    if st.button("🔄 Clear Today's Log"):
-        # This deletes the row in the DB for today
+    if st.button("🔄 Reset Daily Log"):
         supabase.table("health_logs").delete().eq("log_date", str(date.today())).execute()
-        st.session_state.clear()
+        st.session_state.total_calories = 0
+        st.session_state.water_cups = 0
+        st.session_state.macros = {"P": 0, "C": 0, "F": 0}
+        st.session_state.food_history = []
         st.rerun()
 
-# --- 7. MAIN DASHBOARD ---
-st.title("VitalAI Pro 🌿")
+# --- 7. DASHBOARD ---
+st.title("VitalAI Coach")
 
-c1, c2, c3 = st.columns(3)
-with c1: st.markdown(f"<div class='metric-card'><b>BMI: {bmi:.1f}</b><br><small>{bmi_cat}</small></div>", unsafe_allow_html=True)
-with c2: st.markdown(f"<div class='metric-card'><b>Budget: {budget}</b><br><small>Goal</small></div>", unsafe_allow_html=True)
-with c3:
-    rem = budget - st.session_state.total_calories
-    st.markdown(f"<div class='metric-card'><b>Left: {rem}</b><br><small>kcal</small></div>", unsafe_allow_html=True)
+col1, col2 = st.columns(2)
+with col1:
+    st.markdown(f"<div class='metric-card'><b>BMI</b><br><span style='font-size:24px;'>{bmi:.1f}</span><br><small>{bmi_cat}</small></div>", unsafe_allow_html=True)
+with col2:
+    st.markdown(f"<div class='metric-card'><b>Budget</b><br><span style='font-size:24px;'>{budget}</span><br><small>kcal</small></div>", unsafe_allow_html=True)
 
-# --- 8. ACTION TABS ---
-t1, t2, t3, t4 = st.tabs(["📸 Photo", "📝 Manual", "🏃 Exercise", "🤖 Coach"])
+rem = budget - st.session_state.total_calories
+st.metric("Remaining Calories", f"{rem} kcal", delta=rem)
+st.progress(min(st.session_state.total_calories / budget, 1.0) if budget > 0 else 0)
+
+# --- 8. LOGGING ACTIONS (MOBILE OPTIMIZED) ---
+st.write("### Log Activity")
+t1, t2, t3, t4, t5 = st.tabs(["📸 Scan", "🏷️ Label", "📝 Manual", "🏃 Exercise", "🤖 Coach"])
 
 with t1:
-    img = st.camera_input("Scan Plate", key="plate")
-    if img:
-        with st.spinner("AI analyzing..."):
-            try:
-                raw_img = Image.open(img)
-                prompt = "Identify food. Return JSON: {\"name\":str, \"cal\":int, \"p\":int, \"c\":int, \"f\":int}"
-                resp = model.generate_content([prompt, raw_img])
-                data = json.loads(resp.text.strip().replace('```json', '').replace('```', ''))
-                log_food(data['name'], data['cal'], data['p'], data['c'], data['f'])
-                st.rerun()
-            except: st.error("Scanning failed.")
+    # Use File Uploader for better Mobile/PWA support
+    up_file = st.file_uploader("Take Photo of Meal", type=['jpg','png','jpeg'])
+    if up_file:
+        st.image(up_file, use_container_width=True)
+        if st.button("Confirm AI Scan"):
+            with st.spinner("Analyzing..."):
+                try:
+                    img = Image.open(up_file)
+                    prompt = "Identify food. Return JSON: {\"name\":str, \"cal\":int, \"p\":int, \"c\":int, \"f\":int}"
+                    resp = model.generate_content([prompt, img])
+                    data = json.loads(resp.text.strip().replace('```json', '').replace('```', ''))
+                    log_food(data['name'], data['cal'], data['p'], data['c'], data['f'])
+                    st.rerun()
+                except: st.error("AI couldn't see clearly.")
 
 with t2:
-    with st.form("manual"):
-        name = st.text_input("Meal Name")
-        ca, cb, cc, cd = st.columns(4)
-        kcal = ca.number_input("Kcal", 0, 2000, 250)
-        if st.form_submit_button("Log"):
-            log_food(name, kcal, 10, 20, 5) # Default macros for brevity
-            st.rerun()
+    lab_file = st.file_uploader("Scan Nutrition Label", type=['jpg','png','jpeg'])
+    if lab_file:
+        st.image(lab_file, use_container_width=True)
+        if st.button("Extract Label Data"):
+            with st.spinner("Reading Label..."):
+                try:
+                    img = Image.open(lab_file)
+                    prompt = "Extract nutrition from label. Return JSON: {\"name\":str, \"cal\":int, \"p\":int, \"c\":int, \"f\":int}"
+                    resp = model.generate_content([prompt, img])
+                    data = json.loads(resp.text.strip().replace('```json', '').replace('```', ''))
+                    log_food(data['name'], data['cal'], data['p'], data['c'], data['f'])
+                    st.rerun()
+                except: st.error("Label scanning failed.")
 
 with t3:
-    burn = st.number_input("Burned calories", 0, 2000, 200)
-    if st.button("Log Workout"):
-        st.session_state.total_calories -= burn # Exercise adds back to budget
-        save_to_db()
-        st.rerun()
+    with st.form("man"):
+        m_name = st.text_input("Food Name")
+        m_cal = st.number_input("Calories", 0, 2000, 250)
+        if st.form_submit_button("Add to Log"):
+            log_food(m_name, m_cal, 10, 20, 5)
+            st.rerun()
 
 with t4:
-    if st.button("Get AI Advice"):
-        advice = model.generate_content(f"I have {rem} cals left. Suggest a snack.")
-        st.info(advice.text)
-
-# --- 9. VISUALS ---
-st.divider()
-v1, v2 = st.columns([2, 1])
-with v1:
-    st.write("**Macro Balance**")
-    if st.session_state.total_calories > 0:
-        st.bar_chart(pd.DataFrame({'G': [st.session_state.macros["P"], st.session_state.macros["C"], st.session_state.macros["F"]]}, index=['P', 'C', 'F']))
-with v2:
-    st.write("**Water**")
-    st.markdown(f"<h2>💧 {st.session_state.water_cups}</h2>", unsafe_allow_html=True)
-    if st.button("🥤 +1"):
+    st.markdown(f"<div class='metric-card'><span style='font-size:30px;'>💧 {st.session_state.water_cups}</span><br>Cups Today</div>", unsafe_allow_html=True)
+    if st.button("🥤 Log Water (+1 Cup)"):
         st.session_state.water_cups += 1
         save_to_db()
         st.rerun()
 
+with t5:
+    if st.button("Get Next Meal Advice"):
+        with st.spinner("Thinking..."):
+            advice = model.generate_content(f"I have {rem} cals left. Suggest a snack.")
+            st.info(advice.text)
+
+# --- 9. HISTORY & CHARTS ---
+st.divider()
+if st.session_state.total_calories > 0:
+    st.write("**Macro Balance**")
+    m_data = pd.DataFrame({'G': [st.session_state.macros["P"], st.session_state.macros["C"], st.session_state.macros["F"]]}, index=['Prot', 'Carb', 'Fat'])
+    st.bar_chart(m_data, color="#000000")
+
 if st.session_state.food_history:
-    with st.expander("📜 Today's Log"):
-        st.table(pd.DataFrame(st.session_state.food_history))
+    with st.expander("📜 View Today's History"):
+        st.dataframe(pd.DataFrame(st.session_state.food_history), hide_index=True, use_container_width=True)
+        if st.button("🗑️ Delete Last Item"):
+            last = st.session_state.food_history.pop()
+            st.session_state.total_calories -= last['Kcal']
+            save_to_db()
+            st.rerun()
