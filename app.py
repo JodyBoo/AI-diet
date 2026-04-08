@@ -3,26 +3,27 @@ import google.generativeai as genai
 from PIL import Image
 import json
 import pandas as pd
-import plotly.express as px
 
-# --- SETUP & THEMING ---
+# --- SETUP & THEME ---
 genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 model = genai.GenerativeModel('gemini-1.5-flash')
 
 st.set_page_config(page_title="VitalAI Pro", page_icon="🥗", layout="centered")
 
-# --- CUSTOM GREEN CSS ---
+# --- CUSTOM CSS (Consolidated Green Theme) ---
 st.markdown("""
     <style>
-    html, body, [class*="st-"] { color: #2E7D32; font-family: 'Helvetica Neue', Arial, sans-serif; }
+    html, body, [class*="st-"] { color: #2E7D32 !important; }
     h1, h2, h3 { color: #1B5E20 !important; }
-    .stButton>button { border-radius: 20px; background-color: #2E7D32; color: white !important; font-weight: bold; }
-    .metric-card { background-color: #F1F8E9; padding: 20px; border-radius: 15px; text-align: center; border: 1px solid #C8E6C9; }
+    .stButton>button { border-radius: 20px; background-color: #2E7D32; color: white !important; font-weight: bold; border: none; width: 100%; }
+    .stButton>button:hover { background-color: #1B5E20; color: white !important; }
+    .metric-card { background-color: #F1F8E9; padding: 15px; border-radius: 12px; text-align: center; border: 1px solid #C8E6C9; height: 100%; }
     .label-box { background-color: #ffffff; border: 2px dashed #2E7D32; padding: 15px; border-radius: 10px; }
+    div[data-testid="stMetricValue"] { color: #1B5E20 !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- DATA PERSISTENCE ---
+# --- DATA PERSISTENCE (Safe initialization) ---
 if 'total_calories' not in st.session_state: st.session_state.total_calories = 0
 if 'burned_calories' not in st.session_state: st.session_state.burned_calories = 0
 if 'water_cups' not in st.session_state: st.session_state.water_cups = 0
@@ -31,12 +32,26 @@ if 'food_history' not in st.session_state: st.session_state.food_history = []
 
 # --- CORE LOGIC ---
 def get_health_stats(w, target_w, h, a, g, act, pace):
+    # BMI FIX: More granular categories
     bmi = w / ((h/100)**2)
-    bmi_cat = "Normal" if 18.5 <= bmi <= 24.9 else "Underweight" if bmi < 18.5 else "Overweight"
+    if bmi < 18.5: bmi_cat = "Underweight"
+    elif 18.5 <= bmi < 25: bmi_cat = "Healthy Weight"
+    elif 25 <= bmi < 30: bmi_cat = "Overweight"
+    else: bmi_cat = "Obese"
+    
+    # Budget Logic (Mifflin-St Jeor)
     bmr = (10*w + 6.25*h - 5*a + 5) if g == "Male" else (10*w + 6.25*h - 5*a - 161)
     acts = {"Sedentary": 1.2, "Lightly Active": 1.375, "Moderately Active": 1.55, "Very Active": 1.725}
     tdee = bmr * acts[act]
-    adj = -(pace * 500) if w > target_w else (pace * 500) if w < target_w else 0
+    
+    # Calculate Adjustment based on Target
+    if w > target_w: # Loss
+        adj = -(pace * 500)
+    elif w < target_w: # Gain
+        adj = (pace * 500)
+    else:
+        adj = 0
+        
     return int(tdee + adj), bmi, bmi_cat
 
 def log_food(name, cal, p, c, f):
@@ -48,7 +63,7 @@ def log_food(name, cal, p, c, f):
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.title("🍏 VitalAI Profile")
+    st.title("🍏 Your Profile")
     a = st.number_input("Age", 13, 100, 25)
     g = st.selectbox("Gender", ["Female", "Male"])
     h = st.number_input("Height (cm)", 100, 250, 170)
@@ -59,108 +74,122 @@ with st.sidebar:
     
     budget, bmi, bmi_cat = get_health_stats(curr_w, target_w, h, a, g, act, pace)
     
-    if st.button("🔄 Reset Daily Log"):
-        st.session_state.clear()
+    st.divider()
+    if st.button("🔄 Reset Daily Progress"):
+        # We only clear the daily stats, not the profile settings
+        st.session_state.total_calories = 0
+        st.session_state.burned_calories = 0
+        st.session_state.water_cups = 0
+        st.session_state.macros = {"P": 0, "C": 0, "F": 0}
+        st.session_state.food_history = []
         st.rerun()
 
 # --- MAIN DASHBOARD ---
-st.title("VitalAI Coach Pro 🌿")
+st.title("VitalAI Coach 🌿")
 
 # Status Cards
 c1, c2, c3 = st.columns(3)
-with c1: st.markdown(f"<div class='metric-card'><b>BMI: {bmi:.1f}</b><br><small>{bmi_cat}</small></div>", unsafe_allow_html=True)
-with c2: st.markdown(f"<div class='metric-card'><b>Budget: {budget}</b><br><small>kcal/day</small></div>", unsafe_allow_html=True)
+with c1: 
+    st.markdown(f"<div class='metric-card'><b>BMI: {bmi:.1f}</b><br><small>{bmi_cat}</small></div>", unsafe_allow_html=True)
+with c2: 
+    st.markdown(f"<div class='metric-card'><b>Budget: {budget}</b><br><small>Goal kcal</small></div>", unsafe_allow_html=True)
 with c3:
     net = st.session_state.total_calories - st.session_state.burned_calories
     rem = budget - net
-    st.markdown(f"<div class='metric-card'><b>Left: {rem}</b><br><small>kcal</small></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='metric-card'><b>Remaining: {rem}</b><br><small>kcal</small></div>", unsafe_allow_html=True)
 
-st.divider()
+st.write("") # Spacer
 
-# --- INTERACTIVE TABS ---
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📸 Photo", "🏷️ Label Scan", "📝 Manual", "🏃 Exercise", "🤖 Coach"])
+# --- ACTION TABS ---
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📸 Photo Scan", "🏷️ Label Scan", "📝 Manual", "🏃 Exercise", "🤖 Advice"])
 
 with tab1:
-    st.write("### AI Plate Scanner")
-    img = st.camera_input("Take a photo of your food", key="plate_cam")
+    img = st.camera_input("Scan Plate", key="plate")
     if img:
-        with st.spinner("AI analyzing plate..."):
-            raw_img = Image.open(img)
-            prompt = "Identify food. Return JSON: {\"name\":str, \"cal\":int, \"p\":int, \"c\":int, \"f\":int}"
-            resp = model.generate_content([prompt, raw_img])
-            data = json.loads(resp.text.strip().replace('```json', '').replace('```', ''))
-            log_food(data['name'], data['cal'], data['p'], data['c'], data['f'])
-            st.rerun()
+        with st.spinner("AI analyzing..."):
+            try:
+                raw_img = Image.open(img)
+                prompt = "Identify food. Return ONLY valid JSON: {\"name\":str, \"cal\":int, \"p\":int, \"c\":int, \"f\":int}"
+                resp = model.generate_content([prompt, raw_img])
+                # Clean AI output
+                clean_text = resp.text.strip().replace('```json', '').replace('```', '')
+                data = json.loads(clean_text)
+                log_food(data['name'], data['cal'], data['p'], data['c'], data['f'])
+                st.rerun()
+            except: st.error("Scanning failed. Try again or use manual.")
 
 with tab2:
-    st.write("### Nutrition Label AI")
-    st.info("Point camera at the 'Nutrition Facts' table on any package.")
-    label_img = st.camera_input("Scan Nutrition Label", key="label_cam")
-    servings = st.number_input("How many servings did you eat?", 1.0, 10.0, 1.0)
-    
+    label_img = st.camera_input("Scan Nutrition Label", key="label")
+    serving_mult = st.number_input("How many servings?", 0.5, 10.0, 1.0, step=0.5)
     if label_img:
-        with st.spinner("Reading Nutrition Label..."):
-            raw_label = Image.open(label_img)
-            # Refined prompt for label OCR
-            label_prompt = f"""
-            Extract information from this Nutrition Facts label. 
-            Multiply all values by {servings} servings.
-            Return ONLY a JSON object: 
-            {{"name": "Product Name", "cal": total_calories, "p": total_protein, "c": total_carbs, "f": total_fat}}
-            """
-            resp = model.generate_content([label_prompt, raw_label])
+        with st.spinner("Reading label..."):
             try:
-                data = json.loads(resp.text.strip().replace('```json', '').replace('```', ''))
+                raw_label = Image.open(label_img)
+                label_prompt = f"Extract nutrition info. Multiply by {serving_mult}. Return JSON: {{\"name\":str, \"cal\":int, \"p\":int, \"c\":int, \"f\":int}}"
+                resp = model.generate_content([label_prompt, raw_label])
+                clean_label = resp.text.strip().replace('```json', '').replace('```', '')
+                data = json.loads(clean_label)
                 log_food(data['name'], data['cal'], data['p'], data['c'], data['f'])
-                st.success(f"Successfully logged {data['name']}!")
                 st.rerun()
-            except:
-                st.error("Could not read label. Please ensure the 'Nutrition Facts' table is clear.")
+            except: st.error("Couldn't read label.")
 
 with tab3:
-    with st.form("manual_entry"):
-        f_name = st.text_input("Meal Name")
-        c_a, c_b, c_c, c_d = st.columns(4)
-        f_cal = c_a.number_input("Kcal", 0, 2000, 250)
-        f_p = c_b.number_input("P(g)", 0, 100, 10)
-        f_c = c_c.number_input("C(g)", 0, 200, 20)
-        f_f = c_d.number_input("F(g)", 0, 100, 5)
-        if st.form_submit_button("Log Meal"):
-            log_food(f_name, f_cal, f_p, f_c, f_f)
+    with st.form("manual"):
+        name = st.text_input("Meal Name")
+        ca, cb, cc, cd = st.columns(4)
+        kcal = ca.number_input("Kcal", 0, 2000, 250)
+        p = cb.number_input("P", 0, 100, 10)
+        c = cc.number_input("C", 0, 200, 20)
+        f = cd.number_input("F", 0, 100, 5)
+        if st.form_submit_button("Log"):
+            log_food(name, kcal, p, c, f)
             st.rerun()
 
 with tab4:
-    ex_name = st.text_input("Workout Type")
-    ex_burn = st.number_input("Kcal Burned", 0, 2000, 200)
+    ex_name = st.text_input("Activity Name")
+    ex_burn = st.number_input("Calories Burned", 0, 2000, 200)
     if st.button("Log Workout"):
         st.session_state.burned_calories += ex_burn
         st.rerun()
 
 with tab5:
-    query = st.text_input("Ask about your diet:")
-    if st.button("Get AI Advice"):
-        advice = model.generate_content(f"Current Status: {rem} cals left, BMI {bmi:.1f}. User asks: {query}")
+    st.write("### AI Coach Advice")
+    if st.button("Get advice for my next meal"):
+        advice_p = f"User has {rem} cals left, current macros: {st.session_state.macros}. Suggest a meal."
+        advice = model.generate_content(advice_p)
         st.info(advice.text)
 
-# --- VISUALS (Native Streamlit Version - No Plotly Required) ---
+# --- VISUALS (Native Streamlit Version - BUG FIX) ---
 st.divider()
-col_left, col_right = st.columns([1, 1])
+v1, v2 = st.columns([2, 1])
 
-with col_left:
-    st.write("### Macros")
+with v1:
+    st.write("**Macro Balance (Grams)**")
     if st.session_state.total_calories > 0:
-        # Create a simple vertical bar chart using native Streamlit
-        macro_counts = {
-            "Protein": [st.session_state.macros["P"]],
-            "Carbs": [st.session_state.macros["C"]],
-            "Fats": [st.session_state.macros["F"]]
-        }
-        st.bar_chart(pd.DataFrame(macro_counts), height=200)
+        # Native Bar Chart (No Plotly needed)
+        chart_data = pd.DataFrame({
+            'Macros': ['Protein', 'Carbs', 'Fats'],
+            'Grams': [st.session_state.macros["P"], st.session_state.macros["C"], st.session_state.macros["F"]]
+        }).set_index('Macros')
+        st.bar_chart(chart_data, color="#2E7D32")
     else:
-        st.info("Log food to see balance")
+        st.caption("No food logged yet.")
 
-with col_right:
-    st.markdown(f"<div class='metric-card'>💧 <b>Hydration</b><br>{st.session_state.water_cups}/8 Cups</div>", unsafe_allow_html=True)
-    if st.button("🥤 Drink Water"):
+with v2:
+    st.write("**Hydration**")
+    st.markdown(f"<h2>💧 {st.session_state.water_cups} <small>Cups</small></h2>", unsafe_allow_html=True)
+    if st.button("🥤 +1 Cup"):
         st.session_state.water_cups += 1
         st.rerun()
+
+# --- HISTORY ---
+if st.session_state.food_history:
+    with st.expander("📜 View Log History"):
+        st.dataframe(pd.DataFrame(st.session_state.food_history), use_container_width=True, hide_index=True)
+        if st.button("🗑️ Remove Last Item"):
+            last = st.session_state.food_history.pop()
+            st.session_state.total_calories -= last['Kcal']
+            st.session_state.macros["P"] -= last['P']
+            st.session_state.macros["C"] -= last['C']
+            st.session_state.macros["F"] -= last['F']
+            st.rerun()
