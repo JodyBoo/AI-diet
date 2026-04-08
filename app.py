@@ -142,26 +142,25 @@ with tab5:
         advice = model.generate_content(f"Current Status: {rem} cals left, BMI {bmi:.1f}. User asks: {query}")
         st.info(advice.text)
 
-# --- VISUALS ---
+# --- VISUALS (Native Streamlit Version - No Plotly Required) ---
 st.divider()
 col_left, col_right = st.columns([1, 1])
 
 with col_left:
+    st.write("### Macros")
     if st.session_state.total_calories > 0:
-        macro_df = pd.DataFrame({
-            "Macro": ["P", "C", "F"],
-            "Grams": [st.session_state.macros["P"], st.session_state.macros["C"], st.session_state.macros["F"]]
-        })
-        fig = px.pie(macro_df, values='Grams', names='Macro', color_discrete_sequence=['#2E7D32', '#A5D6A7', '#1B5E20'], hole=0.5)
-        fig.update_layout(height=250, margin=dict(t=0, b=0, l=0, r=0), showlegend=False)
-        st.plotly_chart(fig, use_container_width=True)
+        # Create a simple vertical bar chart using native Streamlit
+        macro_counts = {
+            "Protein": [st.session_state.macros["P"]],
+            "Carbs": [st.session_state.macros["C"]],
+            "Fats": [st.session_state.macros["F"]]
+        }
+        st.bar_chart(pd.DataFrame(macro_counts), height=200)
+    else:
+        st.info("Log food to see balance")
 
 with col_right:
     st.markdown(f"<div class='metric-card'>💧 <b>Hydration</b><br>{st.session_state.water_cups}/8 Cups</div>", unsafe_allow_html=True)
     if st.button("🥤 Drink Water"):
         st.session_state.water_cups += 1
         st.rerun()
-
-if st.session_state.food_history:
-    with st.expander("📜 Today's History"):
-        st.table(pd.DataFrame(st.session_state.food_history))
