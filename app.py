@@ -10,55 +10,68 @@ from supabase import create_client, Client
 genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 model = genai.GenerativeModel('gemini-1.5-flash')
 
-# Connect to Supabase
 url: str = st.secrets["SUPABASE_URL"]
 key: str = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(url, key)
 
 st.set_page_config(page_title="VitalAI", page_icon="🥗", layout="centered")
 
-# --- 2. FORCED WHITE/BLACK THEME (FIXED UI) ---
+# --- 2. FORCED HIGH-CONTRAST UI (FIXES INVISIBLE TEXT) ---
 st.markdown("""
     <style>
-    /* Force main background and sidebar to White */
+    /* 1. Force Global Background to White */
     .stApp, [data-testid="stSidebar"], [data-testid="stSidebarContent"] {
         background-color: #FFFFFF !important;
     }
 
-    /* Force all text to Black */
-    html, body, [class*="st-"], p, h1, h2, h3, label, span {
+    /* 2. Force ALL text elements to Black */
+    html, body, [class*="st-"], p, h1, h2, h3, label, span, div, small {
         color: #000000 !important;
     }
 
-    /* Fix the Sidebar specifically */
-    [data-testid="stSidebar"] * {
+    /* 3. FIX INPUT BOXES (Number input, Select, Text) */
+    /* This makes the boxes light grey so the black text is visible */
+    input, div[data-baseweb="select"], div[data-baseweb="input"] {
+        background-color: #F0F2F6 !important;
+        color: #000000 !important;
+        border-radius: 10px !important;
+    }
+
+    /* 4. FIX SIDEBAR INPUTS SPECIFICALLY */
+    [data-testid="stSidebar"] input, [data-testid="stSidebar"] div[data-baseweb="select"] {
+        background-color: #F0F2F6 !important;
         color: #000000 !important;
     }
 
-    /* Style Metric Cards */
-    .metric-card {
-        background-color: #FFFFFF;
-        padding: 15px;
-        border-radius: 12px;
-        text-align: center;
-        border: 1px solid #DDDDDD;
-        box-shadow: 0px 2px 5px rgba(0,0,0,0.05);
-        color: #000000;
-    }
-
-    /* Fix File Uploader (Make it light and readable) */
+    /* 5. FIX FILE UPLOADER (The black box issue) */
     [data-testid="stFileUploader"] {
-        background-color: #F8F9FA !important;
-        border: 1px dashed #000000 !important;
-        border-radius: 10px;
-        padding: 10px;
+        background-color: #F0F2F6 !important;
+        border: 2px dashed #CCCCCC !important;
+        border-radius: 15px !important;
+        padding: 10px !important;
     }
     
     [data-testid="stFileUploader"] section {
         color: #000000 !important;
     }
+    
+    /* Small text inside uploader */
+    [data-testid="stFileUploader"]  div div div div {
+        color: #000000 !important;
+    }
 
-    /* Buttons - Large for Mobile */
+    /* 6. STYLE DASHBOARD CARDS */
+    .metric-card {
+        background-color: #FFFFFF;
+        padding: 20px;
+        border-radius: 15px;
+        text-align: center;
+        border: 1px solid #EEEEEE;
+        box-shadow: 0px 4px 10px rgba(0,0,0,0.05);
+        color: #000000;
+    }
+
+    /* 7. BLACK BUTTONS */
     .stButton>button {
         width: 100%;
         border-radius: 12px;
@@ -67,24 +80,11 @@ st.markdown("""
         height: 3.5rem;
         font-size: 18px;
         font-weight: 600;
-        border: none;
+        border: none !important;
     }
 
-    /* Hide Streamlit default UI elements */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-
-    /* Progress Bar color */
-    .stProgress > div > div > div > div {
-        background-color: #000000 !important;
-    }
-    
-    /* Center text in metrics */
-    [data-testid="stMetricValue"] {
-        text-align: center;
-        color: #000000 !important;
-    }
+    /* Hide Streamlit Header/Footer */
+    header, footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
@@ -149,7 +149,7 @@ def log_food(name, cal, p, c, f):
 
 # --- 6. SIDEBAR SETTINGS ---
 with st.sidebar:
-    st.markdown("<h2 style='color:black;'>👤 Profile</h2>", unsafe_allow_html=True)
+    st.markdown("<h2>👤 Profile</h2>", unsafe_allow_html=True)
     a = st.number_input("Age", 13, 100, 25)
     g = st.selectbox("Gender", ["Female", "Male"])
     h = st.number_input("Height (cm)", 100, 250, 170)
@@ -160,7 +160,6 @@ with st.sidebar:
     
     budget, bmi, bmi_cat = get_health_stats(curr_w, target_w, h, a, g, act, pace)
     
-    st.write("---")
     if st.button("🔄 Reset Daily Log"):
         supabase.table("health_logs").delete().eq("log_date", str(date.today())).execute()
         st.session_state.total_calories = 0
@@ -178,10 +177,9 @@ with col1:
 with col2:
     st.markdown(f"<div class='metric-card'><b>Budget</b><br><span style='font-size:24px;'>{budget}</span><br><small>kcal</small></div>", unsafe_allow_html=True)
 
-st.write("")
 rem = budget - st.session_state.total_calories
-# Metric without delta for cleaner UI
-st.metric("Remaining Calories", f"{rem} kcal")
+st.write("")
+st.markdown(f"<h3 style='text-align: center;'>{rem} kcal remaining</h3>", unsafe_allow_html=True)
 st.progress(min(st.session_state.total_calories / budget, 1.0) if budget > 0 else 0)
 
 # --- 8. LOGGING ACTIONS ---
@@ -234,22 +232,17 @@ with t4:
         st.rerun()
 
 with t5:
-    if st.button("Get AI Advice"):
+    if st.button("Get Next Meal Advice"):
         with st.spinner("Thinking..."):
             advice = model.generate_content(f"I have {rem} cals left. Suggest a snack.")
             st.info(advice.text)
 
-# --- 9. HISTORY & CHARTS ---
+# --- 9. HISTORY ---
 st.divider()
-if st.session_state.total_calories > 0:
-    st.write("**Macro Balance (Grams)**")
-    m_data = pd.DataFrame({'G': [st.session_state.macros["P"], st.session_state.macros["C"], st.session_state.macros["F"]]}, index=['Prot', 'Carb', 'Fat'])
-    st.bar_chart(m_data, color="#000000")
-
 if st.session_state.food_history:
     with st.expander("📜 Today's History"):
         st.dataframe(pd.DataFrame(st.session_state.food_history), hide_index=True, use_container_width=True)
-        if st.button("🗑️ Delete Last Entry"):
+        if st.button("🗑️ Delete Last Item"):
             last = st.session_state.food_history.pop()
             st.session_state.total_calories -= last['Kcal']
             save_to_db()
