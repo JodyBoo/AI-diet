@@ -17,37 +17,52 @@ supabase: Client = create_client(url, key)
 
 st.set_page_config(page_title="VitalAI", page_icon="🥗", layout="centered")
 
-# --- 2. MOBILE-FIRST CLEAN THEME (WHITE & BLACK) ---
+# --- 2. FORCED WHITE/BLACK THEME (FIXED UI) ---
 st.markdown("""
     <style>
-    /* Global Styles */
-    .stApp { background-color: #FFFFFF; }
-    html, body, [class*="st-"] { 
-        color: #000000 !important; 
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    /* Force main background and sidebar to White */
+    .stApp, [data-testid="stSidebar"], [data-testid="stSidebarContent"] {
+        background-color: #FFFFFF !important;
     }
-    
-    /* Hide Streamlit elements for "App" feel */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
 
-    /* Metric Cards */
+    /* Force all text to Black */
+    html, body, [class*="st-"], p, h1, h2, h3, label, span {
+        color: #000000 !important;
+    }
+
+    /* Fix the Sidebar specifically */
+    [data-testid="stSidebar"] * {
+        color: #000000 !important;
+    }
+
+    /* Style Metric Cards */
     .metric-card {
         background-color: #FFFFFF;
-        padding: 20px;
-        border-radius: 15px;
+        padding: 15px;
+        border-radius: 12px;
         text-align: center;
-        border: 1px solid #EEEEEE;
-        box-shadow: 0px 2px 8px rgba(0,0,0,0.05);
-        margin-bottom: 10px;
+        border: 1px solid #DDDDDD;
+        box-shadow: 0px 2px 5px rgba(0,0,0,0.05);
+        color: #000000;
+    }
+
+    /* Fix File Uploader (Make it light and readable) */
+    [data-testid="stFileUploader"] {
+        background-color: #F8F9FA !important;
+        border: 1px dashed #000000 !important;
+        border-radius: 10px;
+        padding: 10px;
+    }
+    
+    [data-testid="stFileUploader"] section {
+        color: #000000 !important;
     }
 
     /* Buttons - Large for Mobile */
     .stButton>button {
         width: 100%;
         border-radius: 12px;
-        background-color: #000000;
+        background-color: #000000 !important;
         color: #FFFFFF !important;
         height: 3.5rem;
         font-size: 18px;
@@ -55,25 +70,20 @@ st.markdown("""
         border: none;
     }
 
-    /* Input Styling */
-    .stTextInput>div>div>input, .stNumberInput>div>div>input {
-        background-color: #F8F9FA;
-        border-radius: 10px;
-        border: 1px solid #EEEEEE;
-    }
+    /* Hide Streamlit default UI elements */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
 
-    /* File Uploader Box */
-    [data-testid="stFileUploader"] {
-        background-color: #F8F9FA;
-        border: 2px dashed #000000;
-        border-radius: 15px;
-        padding: 10px;
+    /* Progress Bar color */
+    .stProgress > div > div > div > div {
+        background-color: #000000 !important;
     }
-
-    /* Metric Values */
-    div[data-testid="stMetricValue"] {
+    
+    /* Center text in metrics */
+    [data-testid="stMetricValue"] {
+        text-align: center;
         color: #000000 !important;
-        font-weight: 800 !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -139,7 +149,7 @@ def log_food(name, cal, p, c, f):
 
 # --- 6. SIDEBAR SETTINGS ---
 with st.sidebar:
-    st.title("👤 Profile")
+    st.markdown("<h2 style='color:black;'>👤 Profile</h2>", unsafe_allow_html=True)
     a = st.number_input("Age", 13, 100, 25)
     g = st.selectbox("Gender", ["Female", "Male"])
     h = st.number_input("Height (cm)", 100, 250, 170)
@@ -150,6 +160,7 @@ with st.sidebar:
     
     budget, bmi, bmi_cat = get_health_stats(curr_w, target_w, h, a, g, act, pace)
     
+    st.write("---")
     if st.button("🔄 Reset Daily Log"):
         supabase.table("health_logs").delete().eq("log_date", str(date.today())).execute()
         st.session_state.total_calories = 0
@@ -167,17 +178,18 @@ with col1:
 with col2:
     st.markdown(f"<div class='metric-card'><b>Budget</b><br><span style='font-size:24px;'>{budget}</span><br><small>kcal</small></div>", unsafe_allow_html=True)
 
+st.write("")
 rem = budget - st.session_state.total_calories
-st.metric("Remaining Calories", f"{rem} kcal", delta=rem)
+# Metric without delta for cleaner UI
+st.metric("Remaining Calories", f"{rem} kcal")
 st.progress(min(st.session_state.total_calories / budget, 1.0) if budget > 0 else 0)
 
-# --- 8. LOGGING ACTIONS (MOBILE OPTIMIZED) ---
+# --- 8. LOGGING ACTIONS ---
 st.write("### Log Activity")
-t1, t2, t3, t4, t5 = st.tabs(["📸 Scan", "🏷️ Label", "📝 Manual", "🏃 Exercise", "🤖 Coach"])
+t1, t2, t3, t4, t5 = st.tabs(["📸 Scan", "🏷️ Label", "📝 Manual", "💧 Water", "🤖 Coach"])
 
 with t1:
-    # Use File Uploader for better Mobile/PWA support
-    up_file = st.file_uploader("Take Photo of Meal", type=['jpg','png','jpeg'])
+    up_file = st.file_uploader("Take Photo of Meal", type=['jpg','png','jpeg'], key="plate")
     if up_file:
         st.image(up_file, use_container_width=True)
         if st.button("Confirm AI Scan"):
@@ -192,7 +204,7 @@ with t1:
                 except: st.error("AI couldn't see clearly.")
 
 with t2:
-    lab_file = st.file_uploader("Scan Nutrition Label", type=['jpg','png','jpeg'])
+    lab_file = st.file_uploader("Scan Nutrition Label", type=['jpg','png','jpeg'], key="label")
     if lab_file:
         st.image(lab_file, use_container_width=True)
         if st.button("Extract Label Data"):
@@ -222,7 +234,7 @@ with t4:
         st.rerun()
 
 with t5:
-    if st.button("Get Next Meal Advice"):
+    if st.button("Get AI Advice"):
         with st.spinner("Thinking..."):
             advice = model.generate_content(f"I have {rem} cals left. Suggest a snack.")
             st.info(advice.text)
@@ -230,14 +242,14 @@ with t5:
 # --- 9. HISTORY & CHARTS ---
 st.divider()
 if st.session_state.total_calories > 0:
-    st.write("**Macro Balance**")
+    st.write("**Macro Balance (Grams)**")
     m_data = pd.DataFrame({'G': [st.session_state.macros["P"], st.session_state.macros["C"], st.session_state.macros["F"]]}, index=['Prot', 'Carb', 'Fat'])
     st.bar_chart(m_data, color="#000000")
 
 if st.session_state.food_history:
-    with st.expander("📜 View Today's History"):
+    with st.expander("📜 Today's History"):
         st.dataframe(pd.DataFrame(st.session_state.food_history), hide_index=True, use_container_width=True)
-        if st.button("🗑️ Delete Last Item"):
+        if st.button("🗑️ Delete Last Entry"):
             last = st.session_state.food_history.pop()
             st.session_state.total_calories -= last['Kcal']
             save_to_db()
